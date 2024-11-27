@@ -1,0 +1,42 @@
+package org.otel.client.ai.example;
+
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
+
+import java.util.HashMap;
+import java.util.Map;
+
+
+public class App {
+    public static final OpenTelemetry OTEL = initOTEL();
+
+    public static void main(String[] args) {
+        final Tracer tracer = OTEL.getTracer("example");
+        tracer.spanBuilder("start-span")
+                        .setSpanKind(SpanKind.CLIENT)
+                                .setAttribute("num", 0)
+                                        .startSpan()
+                                                .end();
+        System.out.println("Hello World!");
+    }
+
+    public static OpenTelemetry initOTEL() {
+        final AutoConfiguredOpenTelemetrySdkBuilder sdkBuilder = AutoConfiguredOpenTelemetrySdk.builder();
+        final OpenTelemetry otel = sdkBuilder
+                .addPropertiesSupplier(() -> {
+                    final Map<String, String> properties = new HashMap<>();
+                    properties.put("otel.exporter.otlp.endpoint", "http://localhost:4318");
+                    properties.put("otel.exporter.otlp.insecure", "true");
+                    properties.put("otel.exporter.otlp.protocol", "http/protobuf");
+                    properties.put("otel.config.max.attrs", "16");
+                    return properties;
+                })
+                .setResultAsGlobal()
+                .build()
+                .getOpenTelemetrySdk();
+        return otel;
+    }
+}

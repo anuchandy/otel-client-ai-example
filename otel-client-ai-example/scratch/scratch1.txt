@@ -1,0 +1,160 @@
+package org.otel.client.ai.example;
+
+import com.azure.ai.inference.implementation.Tracing;
+import com.azure.ai.inference.implementation.models.CompleteRequest;
+import com.azure.ai.inference.models.ChatCompletions;
+import com.azure.ai.inference.models.ChatCompletionsOptions;
+import com.azure.ai.inference.models.ChatCompletionsToolDefinition;
+import com.azure.ai.inference.models.ChatRequestMessage;
+import com.azure.ai.inference.models.ChatRequestSystemMessage;
+import com.azure.ai.inference.models.ChatRequestUserMessage;
+import com.azure.ai.inference.models.FunctionDefinition;
+import com.azure.core.tracing.opentelemetry.OpenTelemetryTracingOptions;
+import com.azure.core.util.BinaryData;
+import com.azure.core.util.ClientOptions;
+import com.azure.core.util.Context;
+import com.azure.core.util.TracingOptions;
+import com.azure.core.util.tracing.StartSpanOptions;
+import com.azure.core.util.tracing.TracerProvider;
+import com.azure.json.JsonProviders;
+import com.azure.json.JsonWriter;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+public final class AIInferenceTracingDryRun {
+    public static final OpenTelemetry OTEL = initOTEL();
+
+    public static void main(String[] args) throws IOException {
+        final TracingOptions customTracingOptions = new OpenTelemetryTracingOptions()
+                .setOpenTelemetry(OTEL);
+        final ClientOptions clientOptions = new ClientOptions().setTracingOptions(customTracingOptions);
+
+        final Tracing tracing = new Tracing("http://localhost", clientOptions);
+
+        List<ChatRequestMessage> messages = new ArrayList<>();
+        messages.add(new ChatRequestSystemMessage("You are a helpful assistant."));
+        messages.add(new ChatRequestUserMessage("What is the weather and temperature in Seattle?"));
+
+        final FunctionDefinition getWeatherFunction = new FunctionDefinition("get_weather")
+                .setDescription("Returns description of the weather in the specified city")
+                .setParameters(BinaryData.fromBytes(getWeatherParameters()));
+        final ChatCompletionsToolDefinition weatherDefinition = new ChatCompletionsToolDefinition(getWeatherFunction);
+
+        final FunctionDefinition getTemperatureFunction = new FunctionDefinition("get_temperature")
+                .setDescription("Returns the current temperature for the specified city")
+                .setParameters(BinaryData.fromBytes(getTemperatureParameters()));
+        final ChatCompletionsToolDefinition temperatureDefinition = new ChatCompletionsToolDefinition(getTemperatureFunction);
+
+        final List<ChatCompletionsToolDefinition> toolDefinitions = new ArrayList<>();
+        toolDefinitions.add(weatherDefinition);
+        toolDefinitions.add(temperatureDefinition);
+
+        final ChatCompletionsOptions options = new ChatCompletionsOptions(messages).setTools(toolDefinitions);
+        final CompleteRequest request = new CompleteRequest(options.getMessages()).setFrequencyPenalty(options.getFrequencyPenalty())
+                .setStream(options.isStream())
+                .setPresencePenalty(options.getPresencePenalty())
+                .setTemperature(options.getTemperature())
+                .setTopP(options.getTopP())
+                .setMaxTokens(options.getMaxTokens())
+                .setResponseFormat(options.getResponseFormat())
+                .setStop(options.getStop())
+                .setTools(options.getTools())
+                .setToolChoice(options.getToolChoice())
+                .setSeed(options.getSeed())
+                .setModel(options.getModel());
+        BinaryData completeRequest = BinaryData.fromObject(request);
+
+        Function<Context, ChatCompletions> operation = new Function<Context, ChatCompletions>() {
+            @Override
+            public ChatCompletions apply(Context context) {
+                final TracingOptions tracingOptions = clientOptions == null ? null : clientOptions.getTracingOptions();
+                com.azure.core.util.tracing.Tracer localTracer = TracerProvider.getDefaultProvider().createTracer("contoso-client", "1.0", "Contoso.Service", tracingOptions);
+                StartSpanOptions spanOptions = new StartSpanOptions(com.azure.core.util.tracing.SpanKind.CLIENT).setAttribute("http.method", "POST");
+                Context span = localTracer.start("contoso-complete", spanOptions, context);
+                localTracer.end(null, null, span);
+                return null;
+            }
+        };
+
+        // ChatCompletions response = tracing.traceComplete(request, operation, Context.NONE);
+    }
+
+    private static byte[] getWeatherParameters() throws IOException {
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+             JsonWriter jsonWriter = JsonProviders.createWriter(byteArrayOutputStream)) {
+            jsonWriter.writeStartObject();
+            jsonWriter.writeStringField("type", "object");
+            jsonWriter.writeStartObject("properties");
+            jsonWriter.writeStartObject("city");
+            jsonWriter.writeStringField("type", "string");
+            jsonWriter.writeStringField("description", "The name of the city for which weather info is requested");
+            jsonWriter.writeEndObject();
+            jsonWriter.writeEndObject();
+            jsonWriter.writeStartArray("required");
+            jsonWriter.writeString("city");
+            jsonWriter.writeEndArray();
+            jsonWriter.writeEndObject();
+            jsonWriter.flush();
+            return byteArrayOutputStream.toByteArray();
+        }
+    }
+
+    private static byte[] getTemperatureParameters() throws IOException {
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+             JsonWriter jsonWriter = JsonProviders.createWriter(byteArrayOutputStream)) {
+            jsonWriter.writeStartObject();
+            jsonWriter.writeStringField("type", "object");
+            jsonWriter.writeStartObject("properties");
+            jsonWriter.writeStartObject("city");
+            jsonWriter.writeStringField("type", "string");
+            jsonWriter.writeStringField("description", "The name of the city for which temperature info is requested");
+            jsonWriter.writeEndObject();
+            jsonWriter.writeEndObject();
+            jsonWriter.writeStartArray("required");
+            jsonWriter.writeString("city");
+            jsonWriter.writeEndArray();
+            jsonWriter.writeEndObject();
+            jsonWriter.flush();
+            return byteArrayOutputStream.toByteArray();
+        }
+    }
+
+    public static OpenTelemetry initOTEL() {
+        final AutoConfiguredOpenTelemetrySdkBuilder sdkBuilder = AutoConfiguredOpenTelemetrySdk.builder();
+        final OpenTelemetry otel = sdkBuilder
+                .addPropertiesSupplier(() -> {
+                    final Map<String, String> properties = new HashMap<>();
+                    properties.put("otel.exporter.otlp.endpoint", "http://localhost:4318");
+                    properties.put("otel.exporter.otlp.insecure", "true");
+                    properties.put("otel.exporter.otlp.protocol", "http/protobuf");
+                    properties.put("otel.config.max.attrs", "16");
+                    return properties;
+                })
+                .setResultAsGlobal()
+                .build()
+                .getOpenTelemetrySdk();
+        return otel;
+    }
+
+
+    private void foo() {
+        final Tracer tracer = OTEL.getTracer("example");
+        tracer.spanBuilder("start-span")
+                .setSpanKind(SpanKind.CLIENT)
+                .setAttribute("num", 0)
+                .startSpan()
+                .end();
+        System.out.println("Hello World!");
+    }
+}
