@@ -19,21 +19,22 @@ import com.azure.core.util.tracing.Tracer;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AIInferenceExample {
+public class TraceChatCompletionSample {
+    private static final String APP_NAMESPACE = "contoso-weather-temperature-app";
     static {
         Telemetry.initOTEL();
     }
 
     public static void main(final String[] args) {
         final Tracer appTracer = Telemetry.createTracer();
-        final Context span = Telemetry.startSpan(appTracer);
+        final Context span = Telemetry.startSpan(appTracer, APP_NAMESPACE);
         try(AutoCloseable __ = appTracer.makeSpanCurrent(span)) {
             final ChatCompletionsClient client = createChatCompletionClient();
 
             final List<ChatRequestMessage> messages = new ArrayList<>();
             messages.add(new ChatRequestSystemMessage("You are a helpful assistant."));
             messages.add(new ChatRequestUserMessage("What is the weather and temperature in Seattle?"));
-            final Functions functions = new Functions(appTracer);
+            final GetWeatherTemperatureFunctions functions = new GetWeatherTemperatureFunctions(appTracer);
 
             // POST <namespace>.openai.azure.com/openai/deployments/gpt-4/chat/completion
             ChatCompletions response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()));

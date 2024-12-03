@@ -13,8 +13,6 @@ import java.util.Map;
 import static com.azure.core.util.tracing.SpanKind.CLIENT;
 
 final class Telemetry {
-    private static final String APP_NAMESPACE = "contoso-weather-temperature-app";
-
     static void initOTEL() {
         final AutoConfiguredOpenTelemetrySdkBuilder sdkBuilder = AutoConfiguredOpenTelemetrySdk.builder();
         sdkBuilder
@@ -32,8 +30,8 @@ final class Telemetry {
         return TracerProvider.getDefaultProvider().createTracer("demo-app", "1.0", "Contoso.App", null);
     }
 
-    static Context startSpan(Tracer tracer) {
-        return tracer.start(APP_NAMESPACE, new StartSpanOptions(CLIENT), Context.NONE);
+    static Context startSpan(Tracer tracer, String namespace) {
+        return tracer.start(namespace, new StartSpanOptions(CLIENT), Context.NONE);
     }
 
     static void endSpan(Tracer tracer, Exception e, Context span) {

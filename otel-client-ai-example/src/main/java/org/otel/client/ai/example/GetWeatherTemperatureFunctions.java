@@ -25,13 +25,13 @@ import java.util.concurrent.TimeUnit;
 /**
  * represents function tool ('get_weather', 'get_temperature') definitions and react to model evaluation of function tools.
  */
-final class Functions {
+final class GetWeatherTemperatureFunctions {
     private final Tracer tracer;
     private final WeatherFunc weatherFunc;
     private final TemperatureFunc temperatureFunc;
     private final List<ChatCompletionsToolDefinition> toolDefinitions = new ArrayList<>(2);
 
-    public Functions(Tracer tracer) {
+    public GetWeatherTemperatureFunctions(Tracer tracer) {
         this.tracer = tracer;
         this.weatherFunc = new WeatherFunc();
         this.temperatureFunc = new TemperatureFunc();
