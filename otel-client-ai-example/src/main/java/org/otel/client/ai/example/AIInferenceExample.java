@@ -13,33 +13,30 @@ import com.azure.ai.inference.models.ChatRequestToolMessage;
 import com.azure.ai.inference.models.ChatRequestUserMessage;
 import com.azure.ai.inference.models.CompletionsFinishReason;
 import com.azure.core.credential.AzureKeyCredential;
-import com.azure.core.tracing.opentelemetry.OpenTelemetryTracingOptions;
-import com.azure.core.util.ClientOptions;
 import com.azure.core.util.Context;
-import com.azure.core.util.TracingOptions;
 import com.azure.core.util.tracing.Tracer;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class AIInferenceExample {
+    static {
+        Telemetry.initOTEL();
+    }
 
     public static void main(final String[] args) {
-        //
-        final TracingOptions tracingOptions = new OpenTelemetryTracingOptions().setOpenTelemetry(Telemetry.createOTEL());
-        final ChatCompletionsClient client = createChatCompletionClient(tracingOptions);
-        //
-        final Tracer appTracer = Telemetry.createTracer(tracingOptions);
+        final Tracer appTracer = Telemetry.createTracer();
         final Context span = Telemetry.startSpan(appTracer);
-        try {
+        try(AutoCloseable __ = appTracer.makeSpanCurrent(span)) {
+            final ChatCompletionsClient client = createChatCompletionClient();
+
             final List<ChatRequestMessage> messages = new ArrayList<>();
             messages.add(new ChatRequestSystemMessage("You are a helpful assistant."));
             messages.add(new ChatRequestUserMessage("What is the weather and temperature in Seattle?"));
-            // represents function tool ('get_weather', 'get_temperature') definitions and react to model evaluation of function tools.
             final Functions functions = new Functions(appTracer);
 
             // POST <namespace>.openai.azure.com/openai/deployments/gpt-4/chat/completion
-            ChatCompletions response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()), span);
+            ChatCompletions response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()), Context.NONE);
             ChatChoice choice = response.getChoice();
 
             while (isToolCalls(choice)) {
@@ -50,7 +47,7 @@ public class AIInferenceExample {
                     messages.add(toolMessage);
                 }
                 // POST <namespace>.openai.azure.com/openai/deployments/gpt-4/chat/completion
-                response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()), span);
+                response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()), Context.NONE);
                 choice = response.getChoice();
             }
 
@@ -61,11 +58,10 @@ public class AIInferenceExample {
         }
     }
 
-    private static ChatCompletionsClient createChatCompletionClient(TracingOptions tracingOptions) {
+    private static ChatCompletionsClient createChatCompletionClient() {
         return new ChatCompletionsClientBuilder()
                 .endpoint(System.getenv("AZURE_AI_CHAT_ENDPOINT"))
                 .credential(new AzureKeyCredential(System.getenv("AZURE_AI_CHAT_KEY")))
-                .clientOptions(new ClientOptions().setTracingOptions(tracingOptions))
                 .buildClient();
     }
 

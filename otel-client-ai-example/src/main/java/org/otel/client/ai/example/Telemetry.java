@@ -1,11 +1,9 @@
 package org.otel.client.ai.example;
 
 import com.azure.core.util.Context;
-import com.azure.core.util.TracingOptions;
 import com.azure.core.util.tracing.StartSpanOptions;
 import com.azure.core.util.tracing.Tracer;
 import com.azure.core.util.tracing.TracerProvider;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdkBuilder;
 
@@ -17,23 +15,21 @@ import static com.azure.core.util.tracing.SpanKind.CLIENT;
 final class Telemetry {
     private static final String APP_NAMESPACE = "contoso-weather-temperature-app";
 
-    static OpenTelemetry createOTEL() {
+    static void initOTEL() {
         final AutoConfiguredOpenTelemetrySdkBuilder sdkBuilder = AutoConfiguredOpenTelemetrySdk.builder();
-        return sdkBuilder
+        sdkBuilder
                 .addPropertiesSupplier(() -> {
                     final Map<String, String> properties = new HashMap<>();
-                    properties.put("otel.exporter.otlp.endpoint", "http://localhost:4318"); // 4317
-                    properties.put("otel.exporter.otlp.insecure", "true");
-                    properties.put("otel.exporter.otlp.protocol", "http/protobuf");
+                    properties.put("otel.exporter.otlp.endpoint", "http://localhost:4317"); // The OTLP/gRPC endpoint.
                     return properties;
                 })
-                .setResultAsGlobal() //
+                .setResultAsGlobal()
                 .build()
                 .getOpenTelemetrySdk();
     }
 
-    static Tracer createTracer(TracingOptions tracingOptions) {
-        return TracerProvider.getDefaultProvider().createTracer("demo-app", "1.0", "Contoso.App", tracingOptions);
+    static Tracer createTracer() {
+        return TracerProvider.getDefaultProvider().createTracer("demo-app", "1.0", "Contoso.App", null);
     }
 
     static Context startSpan(Tracer tracer) {

@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * represents function tool ('get_weather', 'get_temperature') definitions and react to model evaluation of function tools.
+ */
 final class Functions {
     private final Tracer tracer;
     private final WeatherFunc weatherFunc;
