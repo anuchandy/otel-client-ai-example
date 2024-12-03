@@ -36,7 +36,7 @@ public class AIInferenceExample {
             final Functions functions = new Functions(appTracer);
 
             // POST <namespace>.openai.azure.com/openai/deployments/gpt-4/chat/completion
-            ChatCompletions response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()), Context.NONE);
+            ChatCompletions response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()));
             ChatChoice choice = response.getChoice();
 
             while (isToolCalls(choice)) {
@@ -47,7 +47,7 @@ public class AIInferenceExample {
                     messages.add(toolMessage);
                 }
                 // POST <namespace>.openai.azure.com/openai/deployments/gpt-4/chat/completion
-                response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()), Context.NONE);
+                response = client.complete(new ChatCompletionsOptions(messages).setTools(functions.toolDefinitions()));
                 choice = response.getChoice();
             }
 
